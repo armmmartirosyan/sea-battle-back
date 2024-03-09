@@ -14,10 +14,29 @@ const io = socketIo(server, {
 app.use(express.static("public"));
 
 io.on("connection", (socket) => {
-  console.log("A user connected");
+  const { username } = socket.handshake.query;
+
+  socket.join(`user_${username}`);
+
+  let clentsList = Array.from(io.sockets.sockets, ([_, value]) => value);
+  clentsList = clentsList.map((client) => client.handshake.query.username);
+
+  let isTheirTurn = false;
+
+  if (clentsList && clentsList.length && clentsList.length % 2 === 0) {
+    isTheirTurn = true;
+  }
+
+  io.to(`user_${username}`).emit("connected", isTheirTurn);
+
+  console.log({ isTheirTurn, clentsList, username });
 
   socket.on("ready", (message) => {
     socket.broadcast.emit("ready", message);
+  });
+
+  socket.on("switch_turn", (message) => {
+    io.emit("switch_turn", message);
   });
 
   socket.on("ask", (message) => {
@@ -30,7 +49,6 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     socket.broadcast.emit("disconnected-user");
-    console.log("A user disconnected");
   });
 });
 
